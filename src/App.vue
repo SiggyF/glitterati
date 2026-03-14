@@ -20,6 +20,7 @@ import {
 const regionPalette = ['#1d4ed8', '#0891b2', '#7c3aed', '#059669', '#ea580c', '#db2777']
 const pressDelay = 230
 const inconsistencyDelayMs = 7000
+const puzzlesPerPage = 12
 const difficultyRank = {
   Easy: 1,
   Medium: 2,
@@ -27,6 +28,7 @@ const difficultyRank = {
   Expert: 4,
 }
 const activePuzzleIndex = ref(0)
+const currentPuzzlePage = ref(1)
 const gameState = ref(createGameState(puzzles[activePuzzleIndex.value]))
 const pendingPresses = new Map()
 const showInconsistencyPanel = ref(false)
@@ -100,6 +102,13 @@ const puzzleOrder = computed(() =>
       return left.puzzle.name.localeCompare(right.puzzle.name)
     }),
 )
+
+const totalPuzzlePages = computed(() => Math.max(1, Math.ceil(puzzleOrder.value.length / puzzlesPerPage)))
+
+const paginatedPuzzleOrder = computed(() => {
+  const start = (currentPuzzlePage.value - 1) * puzzlesPerPage
+  return puzzleOrder.value.slice(start, start + puzzlesPerPage)
+})
 
 const currentPuzzle = computed(() => puzzles[activePuzzleIndex.value])
 const grid = computed(() => getGrid(gameState.value, currentPuzzle.value))
@@ -340,6 +349,7 @@ function switchPuzzle(index) {
   }
   suppressNextClick = false
   activePuzzleIndex.value = index
+  syncPuzzlePageForIndex(index)
   gameState.value = createGameState(puzzles[index])
 }
 
@@ -359,6 +369,59 @@ function resetPuzzle() {
 function nextPuzzle() {
   switchPuzzle((activePuzzleIndex.value + 1) % puzzles.length)
 }
+
+function randomPuzzle() {
+  if (puzzles.length <= 1) {
+    return
+  }
+
+  let nextIndex = activePuzzleIndex.value
+  while (nextIndex === activePuzzleIndex.value) {
+    nextIndex = Math.floor(Math.random() * puzzles.length)
+  }
+  switchPuzzle(nextIndex)
+}
+
+function previousPuzzlePage() {
+  if (currentPuzzlePage.value <= 1) {
+    return
+  }
+  currentPuzzlePage.value -= 1
+}
+
+function nextPuzzlePage() {
+  if (currentPuzzlePage.value >= totalPuzzlePages.value) {
+    return
+  }
+  currentPuzzlePage.value += 1
+}
+
+function syncPuzzlePageForIndex(index) {
+  const sortedPosition = puzzleOrder.value.findIndex((entry) => entry.index === index)
+  if (sortedPosition < 0) {
+    return
+  }
+
+  currentPuzzlePage.value = Math.floor(sortedPosition / puzzlesPerPage) + 1
+}
+
+watch(
+  totalPuzzlePages,
+  (pageCount) => {
+    if (currentPuzzlePage.value > pageCount) {
+      currentPuzzlePage.value = pageCount
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  puzzleOrder,
+  () => {
+    syncPuzzlePageForIndex(activePuzzleIndex.value)
+  },
+  { immediate: true },
+)
 
 function sortBoardKeys(keys) {
   return [...keys].sort((left, right) => {
@@ -581,7 +644,7 @@ function canAddStar(row, col) {
             </div>
             <div class="mt-4 grid gap-2">
               <button
-                v-for="entry in puzzleOrder"
+                v-for="entry in paginatedPuzzleOrder"
                 :key="entry.puzzle.id"
                 type="button"
                 class="flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition"
@@ -602,6 +665,27 @@ function canAddStar(row, col) {
                 </span>
               </button>
             </div>
+            <div class="mt-4 flex items-center justify-between gap-2 rounded-xl border border-slate-800 bg-slate-950/40 p-2">
+              <button
+                type="button"
+                class="rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-slate-200 transition disabled:cursor-not-allowed disabled:opacity-40 hover:bg-white/10"
+                :disabled="currentPuzzlePage === 1"
+                @click="previousPuzzlePage"
+              >
+                Prev page
+              </button>
+              <span class="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                Page {{ currentPuzzlePage }} / {{ totalPuzzlePages }}
+              </span>
+              <button
+                type="button"
+                class="rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-slate-200 transition disabled:cursor-not-allowed disabled:opacity-40 hover:bg-white/10"
+                :disabled="currentPuzzlePage === totalPuzzlePages"
+                @click="nextPuzzlePage"
+              >
+                Next page
+              </button>
+            </div>
           </section>
 
           <section class="rounded-3xl border border-slate-800 bg-slate-900/70 p-5 shadow-xl shadow-slate-950/30">
@@ -614,6 +698,9 @@ function canAddStar(row, col) {
             <div class="mt-5 flex flex-wrap gap-3">
               <button type="button" class="rounded-full bg-sky-400 px-4 py-2 font-semibold text-slate-950 hover:bg-sky-300" @click="resetPuzzle">
                 Reset puzzle
+              </button>
+              <button type="button" class="rounded-full bg-emerald-300 px-4 py-2 font-semibold text-slate-950 hover:bg-emerald-200" @click="randomPuzzle">
+                Random puzzle
               </button>
               <button type="button" class="rounded-full bg-white/10 px-4 py-2 font-semibold text-white hover:bg-white/20" @click="nextPuzzle">
                 Next puzzle

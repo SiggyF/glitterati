@@ -854,22 +854,22 @@ function canAddStar(row, col) {
                     :opacity="derivedBlocks.has(toKey(rowIndex, colIndex)) && !gameState.manualBlocks.includes(toKey(rowIndex, colIndex)) ? 0.5 : 0.9"
                   >
                     <line
-                      :x1="colIndex * boardMetrics.cellSize + boardMetrics.cellSize * 0.28"
-                      :y1="rowIndex * boardMetrics.cellSize + boardMetrics.cellSize * 0.28"
-                      :x2="colIndex * boardMetrics.cellSize + boardMetrics.cellSize * 0.72"
-                      :y2="rowIndex * boardMetrics.cellSize + boardMetrics.cellSize * 0.72"
+                      :x1="colIndex * boardMetrics.cellSize + boardMetrics.cellSize * 0.39"
+                      :y1="rowIndex * boardMetrics.cellSize + boardMetrics.cellSize * 0.39"
+                      :x2="colIndex * boardMetrics.cellSize + boardMetrics.cellSize * 0.61"
+                      :y2="rowIndex * boardMetrics.cellSize + boardMetrics.cellSize * 0.61"
                       stroke="#f8fafc"
                       stroke-linecap="round"
-                      stroke-width="6"
+                      stroke-width="3"
                     />
                     <line
-                      :x1="colIndex * boardMetrics.cellSize + boardMetrics.cellSize * 0.72"
-                      :y1="rowIndex * boardMetrics.cellSize + boardMetrics.cellSize * 0.28"
-                      :x2="colIndex * boardMetrics.cellSize + boardMetrics.cellSize * 0.28"
-                      :y2="rowIndex * boardMetrics.cellSize + boardMetrics.cellSize * 0.72"
+                      :x1="colIndex * boardMetrics.cellSize + boardMetrics.cellSize * 0.61"
+                      :y1="rowIndex * boardMetrics.cellSize + boardMetrics.cellSize * 0.39"
+                      :x2="colIndex * boardMetrics.cellSize + boardMetrics.cellSize * 0.39"
+                      :y2="rowIndex * boardMetrics.cellSize + boardMetrics.cellSize * 0.61"
                       stroke="#f8fafc"
                       stroke-linecap="round"
-                      stroke-width="6"
+                      stroke-width="3"
                     />
                   </g>
                 </g>

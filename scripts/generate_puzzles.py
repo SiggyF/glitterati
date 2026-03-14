@@ -13,7 +13,7 @@ TARGET_SIZE_PROFILES = [
 ]
 SINGLETON_PROFILES = [profile for profile in TARGET_SIZE_PROFILES if 1 in profile]
 NON_SINGLETON_PROFILES = [profile for profile in TARGET_SIZE_PROFILES if 1 not in profile]
-PUZZLE_NAMES = [
+BASE_PUZZLE_SPECS = [
     ('sunrise-stripes', 'Sunrise Stripes', 'Easy'),
     ('ribbon-dance', 'Ribbon Dance', 'Easy'),
     ('petal-path', 'Petal Path', 'Easy'),
@@ -25,6 +25,32 @@ PUZZLE_NAMES = [
     ('mosaic-crossing', 'Mosaic Crossing', 'Hard'),
     ('ivy-loop', 'Ivy Loop', 'Expert'),
 ]
+TOTAL_PUZZLES = 100
+
+
+def difficulty_for_index(index):
+    ratio = index / TOTAL_PUZZLES
+    if ratio <= 0.4:
+        return 'Easy'
+    if ratio <= 0.75:
+        return 'Medium'
+    if ratio <= 0.95:
+        return 'Hard'
+    return 'Expert'
+
+
+def build_puzzle_specs():
+    specs = list(BASE_PUZZLE_SPECS)
+    for index in range(len(BASE_PUZZLE_SPECS) + 1, TOTAL_PUZZLES + 1):
+        specs.append(
+            (
+                f'glitter-grid-{index:03d}',
+                f'Glitter Grid {index:03d}',
+                difficulty_for_index(index),
+            )
+        )
+
+    return specs
 
 
 def is_valid_solution(columns):
@@ -138,14 +164,15 @@ def grow_regions(seed, solution, target_sizes):
 
 
 def build_puzzles():
+    puzzle_specs = build_puzzle_specs()
     all_candidates = find_all_candidate_solutions()
     rng = random.Random(314159)
     puzzles = []
 
-    for index, (puzzle_id, name, difficulty) in enumerate(PUZZLE_NAMES, start=1):
+    for index, (puzzle_id, name, difficulty) in enumerate(puzzle_specs, start=1):
         puzzle = None
 
-        wants_singleton = index <= len(PUZZLE_NAMES) // 2
+        wants_singleton = index <= len(puzzle_specs) // 2
         preferred_profiles = SINGLETON_PROFILES if wants_singleton else NON_SINGLETON_PROFILES
 
         for attempt in range(1, 3001):

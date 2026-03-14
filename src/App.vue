@@ -576,7 +576,7 @@ function canAddStar(row, col) {
             <div class="flex items-center justify-between gap-3">
               <h2 class="text-lg font-bold text-white">Bundled puzzles</h2>
               <span class="rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">
-                10 boards
+                {{ puzzles.length }} boards
               </span>
             </div>
             <div class="mt-4 grid gap-2">

@@ -32,11 +32,13 @@ const currentPuzzlePage = ref(1)
 const gameState = ref(createGameState(puzzles[activePuzzleIndex.value]))
 const pendingPresses = new Map()
 const showInconsistencyPanel = ref(false)
+const showInfoPanel = ref(false)
 const dragState = ref({
   active: false,
   hasDragged: false,
   mode: null,
   startKey: null,
+  lastProcessedKey: null,
 })
 let inconsistencyTimerId = null
 let suppressNextClick = false
@@ -471,6 +473,7 @@ function endDragInteraction() {
     hasDragged: false,
     mode: null,
     startKey: null,
+    lastProcessedKey: null,
   }
 }
 
@@ -496,6 +499,7 @@ function handleCellPointerDown(row, col, event) {
       hasDragged: false,
       mode: null,
       startKey: null,
+      lastProcessedKey: null,
     }
     return
   }
@@ -507,16 +511,25 @@ function handleCellPointerDown(row, col, event) {
     hasDragged: false,
     mode,
     startKey: key,
+    lastProcessedKey: key,
   }
 }
 
 function handleCellPointerEnter(row, col, event) {
-  if (!dragState.value.active || event.buttons !== 1 || !dragState.value.mode) {
+  // Mouse events: only drag if primary button is held
+  if (event.pointerType === 'mouse' && event.buttons === 1) {
+    processCellDrag(row, col)
+  }
+}
+
+function processCellDrag(row, col) {
+  if (!dragState.value.active || !dragState.value.mode) {
     return
   }
 
   const key = toKey(row, col)
-  if (key === dragState.value.startKey) {
+  // Don't re-process the same cell unless we've moved to a new one
+  if (dragState.value.lastProcessedKey === key) {
     return
   }
 
@@ -534,6 +547,25 @@ function handleCellPointerEnter(row, col, event) {
   dragState.value = {
     ...dragState.value,
     hasDragged: true,
+    lastProcessedKey: key
+  }
+}
+
+function handlePointerMove(event) {
+  if (!dragState.value.active || event.pointerType !== 'touch') {
+    return
+  }
+
+  // Find the cell under the pointer for touch devices
+  const svg = event.currentTarget
+  const point = new DOMPoint(event.clientX, event.clientY)
+  const svgPoint = point.matrixTransform(svg.getScreenCTM().inverse())
+  
+  const col = Math.floor(svgPoint.x / boardMetrics.value.cellSize)
+  const row = Math.floor(svgPoint.y / boardMetrics.value.cellSize)
+  
+  if (row >= 0 && row < currentPuzzle.value.size && col >= 0 && col < currentPuzzle.value.size) {
+    processCellDrag(row, col)
   }
 }
 
@@ -609,10 +641,25 @@ function canAddStar(row, col) {
         </section>
 
         <section class="rounded-3xl border border-slate-800 bg-gradient-to-br from-sky-500/20 to-indigo-500/20 p-6 shadow-2xl shadow-slate-950/40 backdrop-blur">
-          <p class="text-sm font-semibold uppercase tracking-[0.3em] text-sky-200">Current puzzle</p>
-          <h2 class="mt-3 text-2xl font-bold text-white">{{ currentPuzzle.name }}</h2>
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <p class="text-sm font-semibold uppercase tracking-[0.3em] text-sky-200">Current puzzle</p>
+              <h2 class="mt-3 text-2xl font-bold text-white">{{ currentPuzzle.name }}</h2>
+            </div>
+            <button
+              type="button"
+              class="flex h-10 w-10 items-center justify-center rounded-full border border-slate-700 bg-slate-800 text-sky-300 hover:bg-slate-700 lg:hidden"
+              aria-label="Toggle instructions"
+              @click="showInfoPanel = !showInfoPanel"
+            >
+              <span class="text-xl font-bold">i</span>
+            </button>
+          </div>
           <div class="mt-3 flex flex-wrap gap-3 text-sm text-slate-200">
-            <span class="rounded-full bg-white/10 px-3 py-1">{{ currentPuzzle.difficulty }}</span>
+            <span class="flex flex-col gap-0.5">
+              <span class="rounded-full bg-white/10 px-3 py-1">{{ currentPuzzle.difficulty }}</span>
+              <span class="px-1 text-[10px] uppercase tracking-widest text-slate-400">Score: {{ currentPuzzle.score }}</span>
+            </span>
             <span class="rounded-full bg-white/10 px-3 py-1">{{ starsPlaced }} / {{ currentPuzzle.size }} stars</span>
           </div>
           <p class="mt-4 text-sm leading-6 text-slate-200">
@@ -633,8 +680,8 @@ function canAddStar(row, col) {
         </section>
       </header>
 
-      <div class="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)]">
-        <aside class="space-y-6">
+      <div class="flex flex-col-reverse gap-5 lg:grid lg:grid-cols-[300px_minmax(0,1fr)]">
+        <aside class="space-y-6" :class="{ 'hidden lg:block': !showInfoPanel }">
           <section class="rounded-3xl border border-slate-800 bg-slate-900/70 p-5 shadow-xl shadow-slate-950/30">
             <div class="flex items-center justify-between gap-3">
               <h2 class="text-lg font-bold text-white">Bundled puzzles</h2>
@@ -642,6 +689,7 @@ function canAddStar(row, col) {
                 {{ puzzles.length }} boards
               </span>
             </div>
+            <!-- ... puzzle list buttons ... -->
             <div class="mt-4 grid gap-2">
               <button
                 v-for="entry in paginatedPuzzleOrder"
@@ -653,7 +701,10 @@ function canAddStar(row, col) {
                   : 'border-slate-800 bg-slate-950/40 text-slate-300 hover:border-slate-700 hover:text-white'"
                 @click="switchPuzzle(entry.index)"
               >
-                <span class="font-semibold">{{ entry.puzzle.name }}</span>
+                <div class="flex flex-col gap-0.5">
+                  <span class="font-semibold">{{ entry.puzzle.name }}</span>
+                  <span class="text-[9px] font-bold uppercase tracking-widest text-slate-500">Score: {{ entry.puzzle.score }}</span>
+                </div>
                 <span class="flex items-center gap-2 text-xs uppercase tracking-[0.2em]">
                   <span
                     v-if="entry.onePath.isSuperEasy"
@@ -719,18 +770,41 @@ function canAddStar(row, col) {
           </section>
         </aside>
 
-        <section class="rounded-[2rem] border border-slate-800 bg-slate-900/70 p-3 shadow-2xl shadow-slate-950/40">
-          <div class="mx-auto w-full max-w-[560px] overflow-hidden rounded-[1.5rem] border border-slate-800 bg-slate-950/70 p-2">
+        <section class="flex flex-1 flex-col items-center justify-start rounded-[2rem] border border-slate-800 bg-slate-900/70 p-3 shadow-2xl shadow-slate-950/40 min-h-0">
+          <div class="relative flex aspect-square w-full max-w-[min(calc(100vh-350px),560px)] items-center justify-center overflow-hidden rounded-[1.5rem] border border-slate-800 bg-slate-950/70 p-2">
             <svg
-              class="aspect-square w-full touch-manipulation select-none"
+              class="h-full w-full touch-none select-none"
               :viewBox="`0 0 ${boardMetrics.boardSize} ${boardMetrics.boardSize}`"
               role="img"
               :aria-label="`${currentPuzzle.name} puzzle board`"
+              @pointermove="handlePointerMove"
               @pointerup="endDragInteraction"
               @pointerleave="endDragInteraction"
               @pointercancel="endDragInteraction"
             >
               <g class="pointer-events-none">
+                <!-- Subtle grid overlay -->
+                <line
+                  v-for="i in currentPuzzle.size + 1"
+                  :key="`v-grid-${i}`"
+                  :x1="(i - 1) * boardMetrics.cellSize"
+                  :y1="0"
+                  :x2="(i - 1) * boardMetrics.cellSize"
+                  :y2="boardMetrics.boardSize"
+                  stroke="#020617"
+                  stroke-width="1.5"
+                />
+                <line
+                  v-for="i in currentPuzzle.size + 1"
+                  :key="`h-grid-${i}`"
+                  :x1="0"
+                  :y1="(i - 1) * boardMetrics.cellSize"
+                  :x2="boardMetrics.boardSize"
+                  :y2="(i - 1) * boardMetrics.cellSize"
+                  stroke="#020617"
+                  stroke-width="1.5"
+                />
+
                 <rect
                   v-for="rowIndex in fullRowsWithoutStar"
                   :key="`full-row-${rowIndex}`"
@@ -755,19 +829,60 @@ function canAddStar(row, col) {
 
               <g v-for="(row, rowIndex) in currentPuzzle.regions" :key="`row-${rowIndex}`">
                 <g v-for="(regionId, colIndex) in row" :key="`${rowIndex}-${colIndex}`">
+                  <!-- Base Cell Background -->
                   <rect
-                    :x="colIndex * boardMetrics.cellSize"
-                    :y="rowIndex * boardMetrics.cellSize"
-                    :width="boardMetrics.cellSize"
-                    :height="boardMetrics.cellSize"
-                    rx="16"
+                    :x="colIndex * boardMetrics.cellSize + 2"
+                    :y="rowIndex * boardMetrics.cellSize + 2"
+                    :width="boardMetrics.cellSize - 4"
+                    :height="boardMetrics.cellSize - 4"
+                    rx="12"
                     :fill="cellFill(regionId)"
-                    :stroke="canAddStar(rowIndex, colIndex) || grid[rowIndex][colIndex] !== CELL_EMPTY ? 'transparent' : '#ef4444'"
-                    :stroke-width="4"
+                    class="transition-colors duration-200"
+                  />
+
+                  <!-- Cell State Layer -->
+                  <rect
+                    :x="colIndex * boardMetrics.cellSize + 2"
+                    :y="rowIndex * boardMetrics.cellSize + 2"
+                    :width="boardMetrics.cellSize - 4"
+                    :height="boardMetrics.cellSize - 4"
+                    rx="12"
+                    :fill="grid[rowIndex][colIndex] === CELL_EMPTY ? 'white' : 'black'"
+                    :fill-opacity="grid[rowIndex][colIndex] === CELL_EMPTY ? 0.06 : (grid[rowIndex][colIndex] === CELL_STAR ? 0 : 0.25)"
                     class="cursor-pointer transition"
                     @pointerdown="handleCellPointerDown(rowIndex, colIndex, $event)"
                     @pointerenter="handleCellPointerEnter(rowIndex, colIndex, $event)"
                     @click="handleCellPress(rowIndex, colIndex)"
+                  />
+
+                  <!-- Interactive Border for Empty Cells -->
+                  <rect
+                    v-if="grid[rowIndex][colIndex] === CELL_EMPTY"
+                    :x="colIndex * boardMetrics.cellSize + 4"
+                    :y="rowIndex * boardMetrics.cellSize + 4"
+                    :width="boardMetrics.cellSize - 8"
+                    :height="boardMetrics.cellSize - 8"
+                    rx="10"
+                    fill="none"
+                    stroke="white"
+                    stroke-opacity="0.1"
+                    stroke-width="1"
+                    pointer-events="none"
+                  />
+
+                  <!-- Conflict / Illegal Highlight -->
+                  <rect
+                    v-if="!canAddStar(rowIndex, colIndex) && grid[rowIndex][colIndex] === CELL_EMPTY"
+                    :x="colIndex * boardMetrics.cellSize + 2"
+                    :y="rowIndex * boardMetrics.cellSize + 2"
+                    :width="boardMetrics.cellSize - 4"
+                    :height="boardMetrics.cellSize - 4"
+                    rx="12"
+                    fill="none"
+                    stroke="#ef4444"
+                    stroke-width="2"
+                    stroke-dasharray="4 2"
+                    pointer-events="none"
                   />
 
                   <line
